@@ -100,6 +100,9 @@ export interface RegisterRequest {
   email?: string;
   elderly_name: string;
   elderly_phone: string;
+  elderly_language?: string;
+  elderly_timezone?: string;
+  elderly_country?: string;
   family_name: string;
   relation_to_elderly: string;
   ai_name: string;
@@ -133,6 +136,9 @@ export interface ElderlyProfile {
   personality_notes: string;
   health_notes: string;
   interests: string;
+  language: string;        // BCP-47 language tag
+  timezone: string;        // IANA timezone
+  country_code: string;    // ISO 3166-1 alpha-2
 }
 
 export interface FamilyMember {

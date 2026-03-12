@@ -22,6 +22,9 @@ class ElderlyProfileUpdate(BaseModel):
     personality_notes: Optional[str] = None
     health_notes: Optional[str] = None
     interests: Optional[str] = None
+    language: Optional[str] = None      # BCP-47 language tag
+    timezone: Optional[str] = None      # IANA timezone
+    country_code: Optional[str] = None  # ISO 3166-1 alpha-2
 
 
 class ElderlyProfileResponse(BaseModel):
@@ -33,6 +36,9 @@ class ElderlyProfileResponse(BaseModel):
     personality_notes: str
     health_notes: str
     interests: str
+    language: str
+    timezone: str
+    country_code: str
 
     class Config:
         from_attributes = True
@@ -62,7 +68,7 @@ class FamilyUpdateResponse(BaseModel):
 class InviteMemberRequest(BaseModel):
     name: str
     phone: str
-    relation_to_elderly: str = "家人"
+    relation_to_elderly: str = "family member"
 
 
 # --- Routes ---
@@ -76,7 +82,7 @@ def get_elderly_profile(
         ElderlyProfile.family_group_id == current_member.family_group_id
     ).first()
     if not elderly:
-        raise HTTPException(status_code=404, detail="未找到老人档案")
+        raise HTTPException(status_code=404, detail="Elderly profile not found")
     return elderly
 
 
@@ -90,7 +96,7 @@ def update_elderly_profile(
         ElderlyProfile.family_group_id == current_member.family_group_id
     ).first()
     if not elderly:
-        raise HTTPException(status_code=404, detail="未找到老人档案")
+        raise HTTPException(status_code=404, detail="Elderly profile not found")
 
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(elderly, field, value)
@@ -177,8 +183,8 @@ def get_family_updates(
         author = db.query(FamilyMember).filter(FamilyMember.id == u.author_id).first()
         result.append(FamilyUpdateResponse(
             id=u.id,
-            author_name=author.name if author else "未知",
-            relation_to_elderly=author.relation_to_elderly if author else "家人",
+            author_name=author.name if author else "Unknown",
+            relation_to_elderly=author.relation_to_elderly if author else "family member",
             content=u.content,
             category=u.category,
             share_with_elderly=u.share_with_elderly,
@@ -199,7 +205,7 @@ def delete_family_update(
         FamilyUpdate.family_group_id == current_member.family_group_id,
     ).first()
     if not update:
-        raise HTTPException(status_code=404, detail="动态不存在")
+        raise HTTPException(status_code=404, detail="Update not found")
 
     db.delete(update)
     db.commit()

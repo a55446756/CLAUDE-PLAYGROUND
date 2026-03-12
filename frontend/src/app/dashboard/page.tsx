@@ -4,13 +4,13 @@ import { calls, tokens, family } from "@/lib/api";
 import type { CallStats, TokenBalance, ElderlyProfile, CallSession } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 import { formatDistanceToNow } from "date-fns";
-import { zhCN } from "date-fns/locale";
+
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
 function EmotionBadge({ score }: { score?: number }) {
-  if (!score) return <span className="text-gray-400 text-sm">未分析</span>;
+  if (!score) return <span className="text-gray-400 text-sm">N/A</span>;
   if (score >= 4.5) return <span className="text-green-600 font-medium text-sm">😄 非常开心</span>;
   if (score >= 3.5) return <span className="text-green-500 font-medium text-sm">😊 心情不错</span>;
   if (score >= 2.5) return <span className="text-yellow-500 font-medium text-sm">😐 状态一般</span>;
@@ -38,7 +38,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
-        <div className="text-gray-400">加载中...</div>
+        <div className="text-gray-400">Loading...</div>
       </div>
     );
   }
@@ -51,7 +51,7 @@ export default function DashboardPage() {
           你好，{user?.name} 👋
         </h1>
         <p className="text-gray-500 mt-1">
-          {elderly ? `正在为 ${elderly.name} 提供陪伴服务` : "欢迎使用亲声伴"}
+          {elderly ? `Companion service active for ${elderly.name}` : "Welcome to CompanionCall"}
         </p>
       </div>
 
@@ -60,13 +60,13 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <div className="text-3xl mb-2">📞</div>
           <div className="text-2xl font-bold text-gray-900">{stats?.total_calls || 0}</div>
-          <div className="text-sm text-gray-500">累计通话次数</div>
+          <div className="text-sm text-gray-500">Total calls</div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <div className="text-3xl mb-2">⏱️</div>
           <div className="text-2xl font-bold text-gray-900">{stats?.total_hours || 0}h</div>
-          <div className="text-sm text-gray-500">累计通话时长</div>
+          <div className="text-sm text-gray-500">Total talk time</div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -74,7 +74,7 @@ export default function DashboardPage() {
           <div className="text-2xl font-bold text-gray-900">
             {stats?.avg_emotion_score?.toFixed(1) || "—"}
           </div>
-          <div className="text-sm text-gray-500">平均情绪评分</div>
+          <div className="text-sm text-gray-500">Avg mood score</div>
         </div>
 
         <div className={`rounded-2xl p-6 shadow-sm border ${
@@ -86,9 +86,9 @@ export default function DashboardPage() {
           <div className="text-2xl font-bold text-gray-900">
             {Math.floor(balance?.balance_minutes || 0)}分钟
           </div>
-          <div className="text-sm text-gray-500">剩余通话时长</div>
+          <div className="text-sm text-gray-500">Remaining call time</div>
           {(balance?.balance_minutes || 0) < 10 && (
-            <div className="text-xs text-red-500 mt-1 font-medium">余量不足，请充值</div>
+            <div className="text-xs text-red-500 mt-1 font-medium">Running low — please top up</div>
           )}
         </div>
       </div>
@@ -96,7 +96,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Emotion trend chart */}
         <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <h2 className="font-semibold text-gray-900 mb-4">近30天情绪趋势</h2>
+          <h2 className="font-semibold text-gray-900 mb-4">Mood trend (last 30 days)</h2>
           {stats?.emotion_trend && stats.emotion_trend.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={stats.emotion_trend}>
@@ -123,7 +123,7 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           ) : (
             <div className="h-48 flex items-center justify-center text-gray-400">
-              暂无通话记录
+              No calls yet
             </div>
           )}
         </div>
@@ -141,22 +141,22 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="text-sm">
-                <span className="text-gray-500">AI称呼：</span>
+                <span className="text-gray-500">AI greets as:</span>
                 <span className="text-gray-700">"{elderly.ai_name}"</span>
               </div>
               <div className="text-sm">
-                <span className="text-gray-500">老人叫AI：</span>
+                <span className="text-gray-500">They call the AI:</span>
                 <span className="text-gray-700">"{elderly.elder_calls_ai}"</span>
               </div>
               <a
                 href="/settings"
                 className="block mt-2 text-center text-sm text-orange-500 hover:text-orange-600"
               >
-                编辑设置 →
+                Edit settings →
               </a>
             </div>
           ) : (
-            <div className="text-gray-400 text-sm">未配置老人信息</div>
+            <div className="text-gray-400 text-sm">No profile configured</div>
           )}
         </div>
       </div>
@@ -164,12 +164,12 @@ export default function DashboardPage() {
       {/* Recent calls */}
       <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">最近通话</h2>
-          <a href="/calls" className="text-sm text-orange-500 hover:text-orange-600">查看全部 →</a>
+          <h2 className="font-semibold text-gray-900">Recent calls</h2>
+          <a href="/calls" className="text-sm text-orange-500 hover:text-orange-600">View all →</a>
         </div>
         <div className="divide-y divide-gray-50">
           {recentCalls.length === 0 ? (
-            <div className="px-6 py-8 text-center text-gray-400">暂无通话记录</div>
+            <div className="px-6 py-8 text-center text-gray-400">No calls yet</div>
           ) : (
             recentCalls.map((call) => (
               <a
@@ -181,11 +181,11 @@ export default function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-1">
                       <span className="text-sm font-medium text-gray-900">
-                        {new Date(call.started_at).toLocaleDateString("zh-CN", {
+                        {new Date(call.started_at).toLocaleDateString(undefined, {
                           month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
                         })}
                       </span>
-                      <span className="text-xs text-gray-400">{call.duration_minutes}分钟</span>
+                      <span className="text-xs text-gray-400">{call.duration_minutes} min</span>
                       {call.alert_triggered && (
                         <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
                           ⚠ 提醒
@@ -193,7 +193,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <p className="text-sm text-gray-500 truncate">
-                      {call.ai_summary || "通话已结束"}
+                      {call.ai_summary || "Call ended"}
                     </p>
                   </div>
                   <EmotionBadge score={call.emotion_score} />

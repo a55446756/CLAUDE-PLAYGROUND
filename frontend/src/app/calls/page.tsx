@@ -36,12 +36,12 @@ export default function CallsPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-400">加载中...</div>
+        <div className="text-center py-12 text-gray-400">Loading...</div>
       ) : data.length === 0 ? (
         <div className="text-center py-16">
           <div className="text-5xl mb-3">📞</div>
-          <div className="text-gray-500">暂无通话记录</div>
-          <div className="text-gray-400 text-sm mt-1">老人拨打绑定的电话号码后，通话记录将显示在这里</div>
+          <div className="text-gray-500">No calls yet</div>
+          <div className="text-gray-400 text-sm mt-1">Call records will appear here once your loved one starts making calls</div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -59,14 +59,14 @@ export default function CallsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium text-gray-900">
-                      {new Date(call.started_at).toLocaleDateString("zh-CN", {
+                      {new Date(call.started_at).toLocaleDateString(undefined, {
                         year: "numeric", month: "long", day: "numeric",
                         hour: "2-digit", minute: "2-digit",
                       })}
                     </span>
                     <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <span>⏱ {call.duration_minutes}分钟</span>
-                      {call.recording_url && <span>🎵 有录音</span>}
+                      <span>⏱ {call.duration_minutes} min</span>
+                      {call.recording_url && <span>🎵 Recording available</span>}
                     </div>
                   </div>
 
@@ -91,7 +91,7 @@ export default function CallsPage() {
 
                   {call.action_items && call.action_items.length > 0 && (
                     <div className="mt-2 text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-1.5">
-                      📌 待跟进：{call.action_items[0]}
+                      📌 Follow up: {call.action_items[0]}
                     </div>
                   )}
                 </div>

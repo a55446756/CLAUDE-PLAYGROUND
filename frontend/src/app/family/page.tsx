@@ -4,14 +4,13 @@ import { family } from "@/lib/api";
 import type { FamilyUpdate } from "@/lib/api";
 import { useAuthStore } from "@/lib/store";
 import { formatDistanceToNow } from "date-fns";
-import { zhCN } from "date-fns/locale";
 
 const CATEGORIES = [
-  { value: "general", label: "日常生活", emoji: "🏡" },
-  { value: "work", label: "工作事业", emoji: "💼" },
-  { value: "health", label: "健康状况", emoji: "💊" },
-  { value: "travel", label: "出行旅行", emoji: "✈️" },
-  { value: "family", label: "家庭喜事", emoji: "🎉" },
+  { value: "general", label: "Daily life", emoji: "🏡" },
+  { value: "work", label: "Work & career", emoji: "💼" },
+  { value: "health", label: "Health", emoji: "💊" },
+  { value: "travel", label: "Travel", emoji: "✈️" },
+  { value: "family", label: "Family news", emoji: "🎉" },
 ];
 
 export default function FamilyPage() {
@@ -52,7 +51,7 @@ export default function FamilyPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("确认删除这条动态？")) return;
+    if (!confirm("Delete this update?")) return;
     await family.deleteUpdate(id);
     loadUpdates();
   }
@@ -64,26 +63,26 @@ export default function FamilyPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">家庭动态</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Family Updates</h1>
           <p className="text-gray-500 mt-1 text-sm">
-            录入您的近期生活动态，AI会在通话时自然地告诉老人
+            Share what&apos;s happening — the AI will weave it naturally into conversations
           </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
           className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-xl text-sm transition-colors"
         >
-          + 添加动态
+          + Add update
         </button>
       </div>
 
       {/* Add form */}
       {showForm && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
-          <h3 className="font-semibold text-gray-900 mb-4">分享一条近况</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">Share a life update</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">分类</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map((cat) => (
                   <button
@@ -126,7 +125,7 @@ export default function FamilyPage() {
                 className="w-4 h-4 text-orange-500 rounded"
               />
               <label htmlFor="share" className="text-sm text-gray-600">
-                让AI告诉老人（关闭则仅作为对话背景知识）
+                Share with them during the call (uncheck to use only as background context)
               </label>
             </div>
 
@@ -147,7 +146,7 @@ export default function FamilyPage() {
                 disabled={submitting}
                 className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-xl text-sm font-medium"
               >
-                {submitting ? "提交中..." : "发布动态"}
+                {submitting ? "Posting..." : "Post update"}
               </button>
             </div>
           </form>
@@ -162,7 +161,7 @@ export default function FamilyPage() {
             !showAll ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
           }`}
         >
-          待播报 ({updates.filter((u) => !u.has_been_shared).length})
+          Pending ({updates.filter((u) => !u.has_been_shared).length})
         </button>
         <button
           onClick={() => setShowAll(true)}
@@ -170,18 +169,18 @@ export default function FamilyPage() {
             showAll ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
           }`}
         >
-          全部记录
+          All updates
         </button>
       </div>
 
       {/* Updates list */}
       {loading ? (
-        <div className="text-center py-8 text-gray-400">加载中...</div>
+        <div className="text-center py-8 text-gray-400">Loading...</div>
       ) : updates.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <div className="text-4xl mb-3">💌</div>
-          <div>{showAll ? "暂无动态记录" : "当前没有待播报的动态"}</div>
-          <div className="text-sm mt-1">点击上方"添加动态"，让AI代您告诉老人您的近况</div>
+          <div>{showAll ? "No updates yet" : "No pending updates"}</div>
+          <div className="text-sm mt-1">Click "Add update" above to share what's new</div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -218,8 +217,7 @@ export default function FamilyPage() {
                     <p className="text-xs text-gray-400 mt-2">
                       {formatDistanceToNow(new Date(update.created_at), {
                         addSuffix: true,
-                        locale: zhCN,
-                      })}
+                        })}
                     </p>
                   </div>
                   {!update.has_been_shared && (

@@ -19,14 +19,14 @@ export default function CallDetailPage() {
     ]).finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="p-8 text-gray-400">加载中...</div>;
-  if (!session) return <div className="p-8 text-gray-400">通话记录不存在</div>;
+  if (loading) return <div className="p-8 text-gray-400">Loading...</div>;
+  if (!session) return <div className="p-8 text-gray-400">Call not found</div>;
 
   return (
     <div className="p-8 max-w-3xl">
       <div className="mb-6">
         <Link href="/calls" className="text-sm text-orange-500 hover:text-orange-600">
-          ← 返回通话记录
+          ← Back to calls
         </Link>
       </div>
 
@@ -35,8 +35,8 @@ export default function CallDetailPage() {
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
           <span className="text-2xl">⚠️</span>
           <div>
-            <div className="font-semibold text-red-700">本次通话触发了紧急提醒</div>
-            <div className="text-sm text-red-600 mt-0.5">请关注老人的状况</div>
+            <div className="font-semibold text-red-700">This call triggered an emergency alert</div>
+            <div className="text-sm text-red-600 mt-0.5">Please check on your loved one</div>
           </div>
         </div>
       )}
@@ -46,17 +46,17 @@ export default function CallDetailPage() {
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-lg font-bold text-gray-900">
-              {new Date(session.started_at).toLocaleDateString("zh-CN", {
+              {new Date(session.started_at).toLocaleDateString(undefined, {
                 year: "numeric", month: "long", day: "numeric",
                 hour: "2-digit", minute: "2-digit",
               })}
             </h1>
             <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
-              <span>⏱ {session.duration_minutes} 分钟</span>
+              <span>⏱ {session.duration_minutes} min</span>
               {session.emotion_score && (
                 <span>💛 情绪 {session.emotion_score.toFixed(1)} 分</span>
               )}
-              {session.recording_url && <span>🎵 有录音</span>}
+              {session.recording_url && <span>🎵 Recording</span>}
             </div>
           </div>
         </div>
@@ -64,7 +64,7 @@ export default function CallDetailPage() {
         {/* AI Summary */}
         {session.ai_summary && (
           <div className="bg-orange-50 rounded-xl p-4">
-            <div className="text-xs font-semibold text-orange-600 mb-2">AI 通话摘要</div>
+            <div className="text-xs font-semibold text-orange-600 mb-2">AI Call Summary</div>
             <p className="text-sm text-gray-700 leading-relaxed">{session.ai_summary}</p>
           </div>
         )}
@@ -74,7 +74,7 @@ export default function CallDetailPage() {
         {/* Health keywords */}
         {session.health_keywords && session.health_keywords.length > 0 && (
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="text-sm font-semibold text-gray-700 mb-3">💊 健康关键词</div>
+            <div className="text-sm font-semibold text-gray-700 mb-3">💊 Health keywords</div>
             <div className="flex flex-wrap gap-2">
               {session.health_keywords.map((kw) => (
                 <span
@@ -91,7 +91,7 @@ export default function CallDetailPage() {
         {/* Topics */}
         {session.topics_discussed && session.topics_discussed.length > 0 && (
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="text-sm font-semibold text-gray-700 mb-3">💬 聊天话题</div>
+            <div className="text-sm font-semibold text-gray-700 mb-3">💬 Topics discussed</div>
             <ul className="space-y-1">
               {session.topics_discussed.map((topic) => (
                 <li key={topic} className="text-sm text-gray-600 flex items-center gap-2">
@@ -107,7 +107,7 @@ export default function CallDetailPage() {
       {/* Action items */}
       {session.action_items && session.action_items.length > 0 && (
         <div className="bg-blue-50 rounded-2xl p-5 mb-4 border border-blue-100">
-          <div className="text-sm font-semibold text-blue-700 mb-3">📌 家人待跟进</div>
+          <div className="text-sm font-semibold text-blue-700 mb-3">📌 家人Follow up</div>
           <ul className="space-y-2">
             {session.action_items.map((item) => (
               <li key={item} className="text-sm text-blue-700 flex items-start gap-2">
@@ -122,7 +122,7 @@ export default function CallDetailPage() {
       {/* Recording */}
       {session.recording_url && (
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
-          <div className="text-sm font-semibold text-gray-700 mb-3">🎙 通话录音</div>
+          <div className="text-sm font-semibold text-gray-700 mb-3">🎙 Call Recording</div>
           <audio controls className="w-full" src={session.recording_url} />
         </div>
       )}
@@ -133,7 +133,7 @@ export default function CallDetailPage() {
           onClick={() => setShowTranscript(!showTranscript)}
           className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
         >
-          <span className="font-medium text-gray-900">完整对话记录 ({transcript.length} 条)</span>
+          <span className="font-medium text-gray-900">Full Transcript ({transcript.length} 条)</span>
           <span className="text-gray-400">{showTranscript ? "▲" : "▼"}</span>
         </button>
 

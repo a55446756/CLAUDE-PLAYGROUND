@@ -2,10 +2,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.user import FamilyMember
 from app.models.token import TokenPackage, TokenTransaction
 from app.routes.auth import get_current_member
@@ -13,6 +14,18 @@ from app.services.token_service import get_family_balance, add_tokens
 from app.models.token import TransactionType
 
 router = APIRouter(prefix="/tokens", tags=["tokens"])
+
+# Default packages seeded on first request (currency = server default, overrideable)
+_DEFAULT_PACKAGES = [
+    dict(name="Free Trial",      description="New user gift, no credit card required",
+         minutes=60,    price_cents=0,     is_subscription=False),
+    dict(name="Starter",         description="Great for occasional calls",
+         minutes=300,   price_cents=599,   is_subscription=True, subscription_interval="month"),
+    dict(name="Family",          description="Perfect for daily check-ins",
+         minutes=800,   price_cents=1299,  is_subscription=True, subscription_interval="month"),
+    dict(name="Family Annual",   description="Best value — unlimited peace of mind",
+         minutes=99999, price_cents=9900,  is_subscription=True, subscription_interval="year"),
+]
 
 
 class PackageResponse(BaseModel):
@@ -23,7 +36,7 @@ class PackageResponse(BaseModel):
     price_cents: int
     currency: str
     is_subscription: bool
-    subscription_interval: str | None
+    subscription_interval: Optional[str]
 
     class Config:
         from_attributes = True
@@ -62,21 +75,21 @@ def get_balance(
 
 @router.get("/packages", response_model=List[PackageResponse])
 def list_packages(db: Session = Depends(get_db)):
-    """List available token packages."""
+    """List available token packages in the server's default currency."""
     packages = db.query(TokenPackage).filter(TokenPackage.is_active == True).all()
 
-    # Seed default packages if empty
     if not packages:
-        default_packages = [
-            TokenPackage(name="体验版", description="新用户专享，免费体验", minutes=60, price_cents=0, currency="CNY"),
-            TokenPackage(name="月卡基础版", description="适合偶尔通话", minutes=300, price_cents=3900, currency="CNY", is_subscription=True, subscription_interval="month"),
-            TokenPackage(name="月卡标准版", description="适合每日通话", minutes=800, price_cents=8900, currency="CNY", is_subscription=True, subscription_interval="month"),
-            TokenPackage(name="年卡家庭版", description="不限时长，最划算", minutes=99999, price_cents=79900, currency="CNY", is_subscription=True, subscription_interval="year"),
-        ]
-        for p in default_packages:
-            db.add(p)
+        currency = settings.DEFAULT_CURRENCY
+        for p in _DEFAULT_PACKAGES:
+            pkg = TokenPackage(
+                currency=currency,
+                is_subscription=False,
+                subscription_interval=None,
+                **p,
+            )
+            db.add(pkg)
         db.commit()
-        packages = default_packages
+        packages = db.query(TokenPackage).filter(TokenPackage.is_active == True).all()
 
     return packages
 
@@ -86,15 +99,13 @@ def get_transactions(
     current_member: FamilyMember = Depends(get_current_member),
     db: Session = Depends(get_db),
 ):
-    """Get transaction history for the current member."""
-    transactions = (
+    return (
         db.query(TokenTransaction)
         .filter(TokenTransaction.member_id == current_member.id)
         .order_by(TokenTransaction.created_at.desc())
         .limit(50)
         .all()
     )
-    return transactions
 
 
 @router.post("/mock-recharge")
@@ -103,17 +114,14 @@ def mock_recharge(
     current_member: FamilyMember = Depends(get_current_member),
     db: Session = Depends(get_db),
 ):
-    """
-    DEV ONLY: Add tokens without payment (for testing).
-    Remove this endpoint in production.
-    """
+    """DEV ONLY: Add tokens without payment (for testing)."""
     transaction = add_tokens(
         db=db,
         member_id=current_member.id,
         family_group_id=current_member.family_group_id,
         seconds=minutes * 60,
         transaction_type=TransactionType.admin_grant,
-        description=f"测试充值 {minutes} 分钟",
+        description=f"Dev top-up: {minutes} minutes",
     )
     return {
         "ok": True,

@@ -1,64 +1,106 @@
 """
 Twilio voice service — handles TwiML generation, STT, TTS, and recording.
-This module bridges the phone call with the AI conversation engine.
+Language and voice are dynamically selected per elderly profile.
 """
+from typing import Optional
 from twilio.rest import Client
-from twilio.twiml.voice_response import VoiceResponse, Gather, Say
+from twilio.twiml.voice_response import VoiceResponse, Gather
 from app.core.config import settings
+from app.models.user import SUPPORTED_LANGUAGES
 
 twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-# Voice settings for Chinese TTS
-TTS_VOICE = "Google.cmn-CN-Wavenet-A"  # Mandarin Chinese female voice
-TTS_LANGUAGE = "zh-CN"
+# Fallback voice/language when profile language is not supported by Twilio TTS
+_FALLBACK_VOICE = "Google.en-US-Wavenet-F"
+_FALLBACK_LANGUAGE = "en-US"
+
+
+def _get_voice_config(language: str) -> tuple[str, str]:
+    """
+    Return (tts_voice, stt_language) for the given BCP-47 language tag.
+    Exact match first, then prefix match, then fallback to English.
+    """
+    if language in SUPPORTED_LANGUAGES:
+        cfg = SUPPORTED_LANGUAGES[language]
+        return cfg["tts_voice"], language
+
+    # Try prefix match (e.g., "zh" → first zh-* entry)
+    prefix = language.split("-")[0].lower()
+    for tag, cfg in SUPPORTED_LANGUAGES.items():
+        if tag.startswith(prefix):
+            return cfg["tts_voice"], tag
+
+    return _FALLBACK_VOICE, _FALLBACK_LANGUAGE
+
+
+def _get_stt_hints(language: str) -> str:
+    """Return speech-recognition hints for the given language."""
+    if language in SUPPORTED_LANGUAGES:
+        return SUPPORTED_LANGUAGES[language].get("stt_hints", "")
+    prefix = language.split("-")[0].lower()
+    for tag, cfg in SUPPORTED_LANGUAGES.items():
+        if tag.startswith(prefix):
+            return cfg.get("stt_hints", "")
+    return ""
 
 
 def build_gather_twiml(
     action_url: str,
     say_text: Optional[str] = None,
+    language: str = "en-US",
     timeout: int = 10,
     speech_timeout: str = "auto",
 ) -> str:
     """
     Build TwiML that speaks text and then listens for speech input.
-    Used for each conversation turn.
+    Language is dynamic per elderly profile.
     """
+    voice, stt_lang = _get_voice_config(language)
+    hints = _get_stt_hints(language)
+
     response = VoiceResponse()
 
-    gather = Gather(
+    gather_kwargs = dict(
         input="speech",
         action=action_url,
         method="POST",
         timeout=timeout,
         speech_timeout=speech_timeout,
-        language=TTS_LANGUAGE,
-        hints="你好,再见,不舒服,吃饭了,身体,最近",  # Speech recognition hints
+        language=stt_lang,
     )
+    if hints:
+        gather_kwargs["hints"] = hints
+
+    gather = Gather(**gather_kwargs)
 
     if say_text:
-        gather.say(say_text, voice=TTS_VOICE, language=TTS_LANGUAGE)
+        gather.say(say_text, voice=voice, language=stt_lang)
 
     response.append(gather)
-
-    # Fallback if no speech detected
     response.redirect(action_url + "?no_input=true", method="POST")
 
     return str(response)
 
 
-def build_say_twiml(text: str, redirect_url: Optional[str] = None) -> str:
+def build_say_twiml(
+    text: str,
+    language: str = "en-US",
+    redirect_url: Optional[str] = None,
+) -> str:
     """Build TwiML that just speaks text (no input expected)."""
+    voice, stt_lang = _get_voice_config(language)
     response = VoiceResponse()
-    response.say(text, voice=TTS_VOICE, language=TTS_LANGUAGE)
+    response.say(text, voice=voice, language=stt_lang)
     if redirect_url:
         response.redirect(redirect_url, method="POST")
     return str(response)
 
 
-def build_end_call_twiml(farewell_text: str) -> str:
+def build_end_call_twiml(farewell_text: str, language: str = "en-US") -> str:
     """Build TwiML for ending a call with a farewell message."""
+    voice, stt_lang = _get_voice_config(language)
     response = VoiceResponse()
-    response.say(farewell_text, voice=TTS_VOICE, language=TTS_LANGUAGE)
+    response.say(farewell_text, voice=voice, language=stt_lang)
     response.hangup()
     return str(response)
 
@@ -66,7 +108,7 @@ def build_end_call_twiml(farewell_text: str) -> str:
 def start_recording(call_sid: str) -> str:
     """Start recording an active call. Returns recording SID."""
     recording = twilio_client.calls(call_sid).recordings.create(
-        recording_channels="dual",  # Capture both sides
+        recording_channels="dual",
     )
     return recording.sid
 
@@ -84,7 +126,3 @@ def send_sms(to: str, body: str) -> None:
         from_=settings.TWILIO_PHONE_NUMBER,
         to=to,
     )
-
-
-# Fix missing Optional import
-from typing import Optional

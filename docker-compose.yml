@@ -6,9 +6,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: qsb
-      POSTGRES_PASSWORD: qsb_dev_pass
-      POSTGRES_DB: qinshengban
+      POSTGRES_USER: ccall
+      POSTGRES_PASSWORD: ccall_dev_pass
+      POSTGRES_DB: companioncall
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,7 +31,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://qsb:qsb_dev_pass@db:5432/qinshengban
+      DATABASE_URL: postgresql://ccall:ccall_dev_pass@db:5432/companioncall
       REDIS_URL: redis://redis:6379/0
       DEBUG: "false"
       # Override these in .env file:

@@ -62,8 +62,8 @@ def _get_system_prompt_for_family(db: Session, family_group_id: int) -> tuple[st
     for u in updates:
         author = db.query(FamilyMember).filter(FamilyMember.id == u.author_id).first()
         updates_data.append({
-            "author": author.name if author else "家人",
-            "relation": author.relation_to_elderly if author else "家人",
+            "author": author.name if author else "Family",
+            "relation": author.relation_to_elderly if author else "family member",
             "content": u.content,
         })
 
@@ -81,7 +81,8 @@ def _get_system_prompt_for_family(db: Session, family_group_id: int) -> tuple[st
         FamilyMember.role == MemberRole.admin,
     ).first()
 
-    relation = admin.relation_to_elderly if admin else "孩子"
+    relation = admin.relation_to_elderly if admin else "family member"
+    language = elderly.language or "en-US"
 
     system_prompt = build_system_prompt(
         elderly_name=elderly.name,
@@ -92,6 +93,7 @@ def _get_system_prompt_for_family(db: Session, family_group_id: int) -> tuple[st
         health_notes=elderly.health_notes,
         interests=elderly.interests,
         family_updates=updates_data,
+        language=language,
         last_session_summary=last_summary,
     )
     return system_prompt, elderly
@@ -115,18 +117,29 @@ async def handle_inbound_call(
     ).first()
 
     if not elderly:
-        # Caller not registered — play a friendly message
         twiml = build_say_twiml(
-            "对不起，您的号码暂未注册。请联系您的家人为您开通服务。再见！"
+            "Sorry, your number is not registered. Please ask a family member to set up your account. Goodbye!"
         )
         return Response(content=twiml, media_type="application/xml")
+
+    lang = elderly.language or "en-US"
 
     # Check token balance
     balance = get_family_balance(db, elderly.family_group_id)
     if balance <= 0:
-        twiml = build_say_twiml(
-            f"您好，{elderly.name}。通话时长已用完，请联系家人充值后再来哦，再见！"
-        )
+        low_bal_msgs = {
+            "en": f"Hello {elderly.name}, your call time has run out. Please ask a family member to top up the account. Goodbye!",
+            "zh": f"您好，{elderly.name}。通话时长已用完，请联系家人充值后再来哦，再见！",
+            "es": f"Hola {elderly.name}, el tiempo de llamada se ha agotado. Por favor pide a un familiar que recargue la cuenta. ¡Adiós!",
+            "fr": f"Bonjour {elderly.name}, votre temps d'appel est épuisé. Demandez à un proche de recharger le compte. Au revoir!",
+            "de": f"Hallo {elderly.name}, Ihre Gesprächszeit ist aufgebraucht. Bitte bitten Sie ein Familienmitglied, das Konto aufzuladen. Auf Wiedersehen!",
+            "ja": f"{elderly.name}さん、通話時間がなくなりました。家族に連絡して時間を追加してもらってください。さようなら！",
+            "ko": f"{elderly.name}님, 통화 시간이 소진되었습니다. 가족에게 연락하여 충전해 주세요. 안녕히 계세요!",
+            "pt": f"Olá {elderly.name}, seu tempo de chamada acabou. Por favor peça a um familiar para recarregar a conta. Tchau!",
+        }
+        from app.services.ai_service import _get_lang_key
+        msg = low_bal_msgs.get(_get_lang_key(lang), low_bal_msgs["en"])
+        twiml = build_say_twiml(msg, language=lang)
         return Response(content=twiml, media_type="application/xml")
 
     # Create call session record
@@ -144,11 +157,11 @@ async def handle_inbound_call(
     try:
         system_prompt, elderly = _get_system_prompt_for_family(db, elderly.family_group_id)
     except Exception as e:
-        twiml = build_say_twiml("系统出现了一点问题，请稍后再拨。")
+        twiml = build_say_twiml("We're having a technical issue. Please try again in a moment. Goodbye!", language=lang)
         return Response(content=twiml, media_type="application/xml")
 
     # Generate greeting
-    greeting = await generate_greeting(system_prompt, elderly.name, elderly.ai_name, elderly.elder_calls_ai)
+    greeting = await generate_greeting(system_prompt, elderly.name, elderly.ai_name, language=lang)
 
     # Initialize call state
     _call_state[CallSid] = {
@@ -158,6 +171,7 @@ async def handle_inbound_call(
         "system_prompt": system_prompt,
         "elderly_id": elderly.id,
         "family_group_id": elderly.family_group_id,
+        "language": lang,
     }
 
     # Save greeting as first turn
@@ -176,7 +190,7 @@ async def handle_inbound_call(
     )
 
     action_url = f"{settings.BASE_URL}/voice/respond"
-    twiml = build_gather_twiml(action_url=action_url, say_text=greeting)
+    twiml = build_gather_twiml(action_url=action_url, say_text=greeting, language=lang)
     return Response(content=twiml, media_type="application/xml")
 
 
@@ -198,6 +212,7 @@ async def handle_speech_input(
     session_id = state["session_id"]
     family_group_id = state["family_group_id"]
     system_prompt = state["system_prompt"]
+    language = state.get("language", "en-US")
     turn_count = state["turn_count"] + 1
 
     # Handle no speech / timeout
@@ -205,36 +220,80 @@ async def handle_speech_input(
     if not user_text.strip():
         # Check if elderly has been quiet for a while
         if turn_count > 30:  # ~30 minutes max
-            farewell = "时间不早了，您好好休息，有空再聊。记得按时吃饭，爱您！"
+            from app.services.ai_service import _get_lang_key
+            farewells = {
+                "en": "It's getting late — take care, get some rest, and call anytime. Love you!",
+                "zh": "时间不早了，您好好休息，有空再聊。记得按时吃饭，爱您！",
+                "es": "Ya es tarde, descansa bien y llama cuando quieras. ¡Te quiero!",
+                "fr": "Il se fait tard, repose-toi bien et appelle quand tu veux. Je t'aime!",
+                "de": "Es wird spät, ruh dich gut aus und ruf an wann du möchtest. Ich liebe dich!",
+                "ja": "もう遅いから、ゆっくり休んでね。また電話してね。大好きだよ！",
+                "ko": "늦었으니 푹 쉬세요. 언제든 전화해요. 사랑해요!",
+                "pt": "Já é tarde, descanse bem e ligue quando quiser. Te amo!",
+            }
+            farewell = farewells.get(_get_lang_key(language), farewells["en"])
             _cleanup_call(db, CallSid, session_id, family_group_id, background_tasks)
-            twiml = build_end_call_twiml(farewell)
+            twiml = build_end_call_twiml(farewell, language=language)
             return Response(content=twiml, media_type="application/xml")
 
-        # Re-prompt gently
-        gentle_prompt = "妈，您在吗？"
+        from app.services.ai_service import _get_lang_key
+        reprompts = {
+            "en": "Hello? Are you there?",
+            "zh": "妈，您在吗？",
+            "es": "¿Mamá? ¿Estás ahí?",
+            "fr": "Allô? Tu es là?",
+            "de": "Hallo? Bist du da?",
+            "ja": "もしもし？聞こえますか？",
+            "ko": "여보세요? 거기 계세요?",
+            "pt": "Alô? Você está aí?",
+        }
+        gentle_prompt = reprompts.get(_get_lang_key(language), reprompts["en"])
         twiml = build_gather_twiml(
             action_url=f"{settings.BASE_URL}/voice/respond",
             say_text=gentle_prompt,
+            language=language,
             timeout=8,
         )
         return Response(content=twiml, media_type="application/xml")
 
-    # Check for goodbye intent
-    goodbye_words = ["再见", "挂了", "挂电话", "拜拜", "不聊了", "先挂了"]
-    if any(word in user_text for word in goodbye_words):
+    # Check for goodbye intent (multilingual)
+    from app.services.ai_service import _get_lang_key
+    goodbye_words_map = {
+        "en": ["goodbye", "bye", "got to go", "talk later", "hanging up", "gotta run"],
+        "zh": ["再见", "挂了", "挂电话", "拜拜", "不聊了", "先挂了"],
+        "es": ["adiós", "chao", "hasta luego", "me voy", "cuelgo"],
+        "fr": ["au revoir", "à bientôt", "je dois partir", "je raccroche"],
+        "de": ["tschüss", "auf wiedersehen", "ich muss gehen", "ich lege auf"],
+        "ja": ["さようなら", "じゃあね", "切るね", "また後で", "バイバイ"],
+        "ko": ["안녕히 계세요", "끊을게요", "나중에", "바이"],
+        "pt": ["tchau", "adeus", "até logo", "vou desligar"],
+    }
+    goodbye_words = goodbye_words_map.get(_get_lang_key(language), goodbye_words_map["en"])
+    farewell_instrs = {
+        "en": "The caller wants to end the call. Say one warm farewell in 1-2 sentences.",
+        "zh": "用户要挂电话了，请说一句温暖的告别语，不超过30字。",
+        "es": "El usuario quiere terminar la llamada. Di una despedida cálida en 1-2 frases.",
+        "fr": "L'utilisateur veut raccrocher. Dis un au revoir chaleureux en 1-2 phrases.",
+        "de": "Der Nutzer möchte auflegen. Sage einen herzlichen Abschied in 1-2 Sätzen.",
+        "ja": "電話を終わろうとしています。温かい別れの言葉を1〜2文で言ってください。",
+        "ko": "전화를 끊으려 합니다. 따뜻한 작별 인사를 1-2문장으로 말해주세요.",
+        "pt": "O usuário quer desligar. Diga um adeus caloroso em 1-2 frases.",
+    }
+    if any(word.lower() in user_text.lower() for word in goodbye_words):
         state["messages"].append({"role": "user", "content": user_text})
+        farewell_instr = farewell_instrs.get(_get_lang_key(language), farewell_instrs["en"])
         farewell_response = await chat_with_elderly(
             messages=state["messages"],
-            system_prompt=system_prompt + "\n用户要挂电话了，请说一句温暖的告别语，不超过30字。",
+            system_prompt=system_prompt + "\n" + farewell_instr,
         )
         _save_turn(db, session_id, turn_count, "user", user_text)
         _save_turn(db, session_id, turn_count + 1, "assistant", farewell_response)
         _cleanup_call(db, CallSid, session_id, family_group_id, background_tasks)
-        twiml = build_end_call_twiml(farewell_response)
+        twiml = build_end_call_twiml(farewell_response, language=language)
         return Response(content=twiml, media_type="application/xml")
 
     # Check for emergency keywords
-    is_emergency, emergency_keyword = check_emergency_keywords(user_text)
+    is_emergency, emergency_keyword = check_emergency_keywords(user_text, language)
 
     # Add user turn to conversation
     state["messages"].append({"role": "user", "content": user_text})
@@ -242,11 +301,19 @@ async def handle_speech_input(
     # Check token balance (deduct 1 minute per turn approximately)
     balance = get_family_balance(db, family_group_id)
     if balance <= 60:  # Less than 1 minute left
-        response_text = (
-            "我要先去忙一下，通话时间快到了，等家人充值后您再打来，我等您！好好保重，再见！"
-        )
+        low_time_msgs = {
+            "en": "I need to go for now — our time is running out. Ask someone to top up and call me back anytime. Take good care! Bye!",
+            "zh": "我要先去忙一下，通话时间快到了，等家人充值后您再打来，我等您！好好保重，再见！",
+            "es": "Tengo que irme por ahora — el tiempo se acaba. Pide a alguien que recargue y llámame. ¡Cuídate mucho!",
+            "fr": "Je dois y aller — notre temps se termine. Demande à quelqu'un de recharger et rappelle-moi. Prends soin de toi!",
+            "de": "Ich muss jetzt gehen — unsere Zeit läuft ab. Bitte jemanden aufzuladen und ruf mich an. Pass auf dich auf!",
+            "ja": "そろそろ行かなきゃ。時間がなくなってきた。また家族に連絡して電話してね。気をつけてね！",
+            "ko": "이제 가봐야 할 것 같아요. 가족에게 충전 부탁하고 다시 전화해요. 건강하세요!",
+            "pt": "Preciso ir — nosso tempo está acabando. Peça alguém para recarregar e me ligue de volta. Cuide-se!",
+        }
+        response_text = low_time_msgs.get(_get_lang_key(language), low_time_msgs["en"])
         _cleanup_call(db, CallSid, session_id, family_group_id, background_tasks)
-        twiml = build_end_call_twiml(response_text)
+        twiml = build_end_call_twiml(response_text, language=language)
         return Response(content=twiml, media_type="application/xml")
 
     # Get AI response
@@ -256,20 +323,39 @@ async def handle_speech_input(
             system_prompt=system_prompt,
         )
     except Exception:
-        ai_response = "稍等一下，我这边信号有点问题，您刚才说什么了？"
+        retry_prompts = {
+            "en": "Sorry, I missed that — could you say it again?",
+            "zh": "稍等一下，我这边信号有点问题，您刚才说什么了？",
+            "es": "Perdona, no te escuché bien. ¿Puedes repetirlo?",
+            "fr": "Pardon, je n'ai pas bien entendu. Tu peux répéter?",
+            "de": "Entschuldigung, ich habe das nicht gehört. Kannst du das wiederholen?",
+            "ja": "すみません、聞こえませんでした。もう一度言ってもらえますか？",
+            "ko": "죄송해요, 잘 못 들었어요. 다시 말씀해 주시겠어요?",
+            "pt": "Desculpa, não ouvi bem. Pode repetir?",
+        }
+        ai_response = retry_prompts.get(_get_lang_key(language), retry_prompts["en"])
 
     # If emergency detected, append urgent notice to AI response
     if is_emergency:
-        ai_response += " 妈，您先别担心，我马上联系家人过来看您，您先坐下来休息一下！"
+        emergency_additions = {
+            "en": " Please don't worry — I'm alerting the family right now. Try to stay calm and sit down. I'll make sure someone checks on you!",
+            "zh": " 您先别担心，我马上联系家人过来看您，您先坐下来休息一下！",
+            "es": " No te preocupes — aviso a la familia ahora mismo. Intenta calmarte y siéntate. ¡Me aseguraré de que alguien vaya a verte!",
+            "fr": " Ne t'inquiète pas — j'alerte la famille maintenant. Essaie de te calmer et assieds-toi.",
+            "de": " Mach dir keine Sorgen — ich alarmiere sofort die Familie. Versuche ruhig zu bleiben und setz dich hin.",
+            "ja": " 心配しないで。すぐに家族に連絡します。座って落ち着いて待っていてね。",
+            "ko": " 걱정하지 마세요. 지금 바로 가족에게 알릴게요. 앉아서 진정하세요.",
+            "pt": " Não se preocupe — estou avisando a família agora. Tente se acalmar e sente-se.",
+        }
+        ai_response += emergency_additions.get(_get_lang_key(language), emergency_additions["en"])
         background_tasks.add_task(
             notify_emergency, db, family_group_id,
-            "老人", f"通话中提到：{user_text[:50]}"
+            "Elderly", f"Said during call: {user_text[:100]}"
         )
-        # Update session alert flag
         session = db.query(CallSession).filter(CallSession.id == session_id).first()
         if session:
             session.alert_triggered = True
-            session.alert_reason = f"检测到关键词：{emergency_keyword}"
+            session.alert_reason = f"Emergency keyword detected: {emergency_keyword}"
             db.commit()
 
     # Save turns
@@ -284,7 +370,7 @@ async def handle_speech_input(
     deduct_tokens(db, family_group_id, 30, session_id)
 
     action_url = f"{settings.BASE_URL}/voice/respond"
-    twiml = build_gather_twiml(action_url=action_url, say_text=ai_response)
+    twiml = build_gather_twiml(action_url=action_url, say_text=ai_response, language=language)
     return Response(content=twiml, media_type="application/xml")
 
 
@@ -393,7 +479,7 @@ async def _post_call_analysis(session_id: int, family_group_id: int):
         session.transcript = transcript
 
         # AI analysis
-        analysis = await analyze_call(transcript, elderly.name)
+        analysis = await analyze_call(transcript, elderly.name, language=elderly.language or "en-US")
         session.ai_summary = analysis.get("summary", "")
         session.emotion_score = analysis.get("emotion_score")
         session.health_keywords = analysis.get("health_mentions", [])

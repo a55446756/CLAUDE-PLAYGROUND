@@ -4,11 +4,11 @@ import { tokens } from "@/lib/api";
 import type { TokenBalance, TokenPackage, TokenTransaction } from "@/lib/api";
 
 const TYPE_LABELS: Record<string, string> = {
-  purchase: "充值",
-  free_trial: "赠送",
-  refund: "退款",
-  usage: "通话消耗",
-  admin_grant: "管理员赠送",
+  purchase: "Top-up",
+  free_trial: "Free trial",
+  refund: "Refund",
+  usage: "Call usage",
+  admin_grant: "Admin grant",
 };
 
 export default function TokensPage() {
@@ -43,13 +43,13 @@ export default function TokensPage() {
     }
   }
 
-  if (loading) return <div className="p-8 text-gray-400">加载中...</div>;
+  if (loading) return <div className="p-8 text-gray-400">Loading...</div>;
 
   return (
     <div className="p-8 max-w-3xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">时长充值</h1>
-        <p className="text-gray-500 mt-1 text-sm">管理通话时长余额</p>
+        <h1 className="text-2xl font-bold text-gray-900">Call Time</h1>
+        <p className="text-gray-500 mt-1 text-sm">Manage your call time balance</p>
       </div>
 
       {/* Balance */}
@@ -60,27 +60,27 @@ export default function TokensPage() {
       }`}>
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-gray-600 mb-1">当前余额</div>
+            <div className="text-sm font-medium text-gray-600 mb-1">Current balance</div>
             <div className="text-4xl font-bold text-gray-900">
               {Math.floor(balance?.balance_minutes || 0)}
-              <span className="text-xl font-normal text-gray-500 ml-1">分钟</span>
+              <span className="text-xl font-normal text-gray-500 ml-1"> min</span>
             </div>
             <div className="text-sm text-gray-400 mt-1">
-              约 {balance?.balance_hours?.toFixed(1)} 小时
+              ~{balance?.balance_hours?.toFixed(1)} hrs
             </div>
           </div>
           <div className="text-6xl opacity-30">💎</div>
         </div>
         {(balance?.balance_minutes || 0) < 30 && (
           <div className="mt-3 text-sm text-red-600 font-medium">
-            ⚠ 余额不足，建议立即充值以保证正常使用
+            ⚠ Balance is low — top up to keep calls going
           </div>
         )}
       </div>
 
       {/* Dev mock recharge */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-8">
-        <div className="text-sm font-semibold text-yellow-800 mb-2">🛠 开发测试充值</div>
+        <div className="text-sm font-semibold text-yellow-800 mb-2">🛠 Dev test recharge</div>
         <div className="flex gap-2 flex-wrap">
           {[30, 60, 300].map((min) => (
             <button
@@ -89,61 +89,61 @@ export default function TokensPage() {
               disabled={mocking}
               className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm rounded-xl font-medium disabled:opacity-50"
             >
-              +{min}分钟
+              +{min} min
             </button>
           ))}
         </div>
-        <p className="text-xs text-yellow-600 mt-2">此功能仅供开发测试使用，正式版将接入支付系统</p>
+        <p className="text-xs text-yellow-600 mt-2">Dev only — production will use real payment</p>
       </div>
 
       {/* Packages */}
-      <h2 className="font-semibold text-gray-900 mb-4">充值套餐</h2>
+      <h2 className="font-semibold text-gray-900 mb-4">Plans</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         {packages.map((pkg) => (
           <div
             key={pkg.id}
             className={`bg-white rounded-2xl p-5 shadow-sm border cursor-pointer transition-all hover:shadow-md ${
-              pkg.name === "月卡标准版"
+              pkg.name === "Family"
                 ? "border-orange-400 ring-2 ring-orange-200"
                 : "border-gray-100"
             }`}
           >
-            {pkg.name === "月卡标准版" && (
+            {pkg.name === "Family" && (
               <div className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full inline-block mb-2 font-medium">
-                推荐
+                Recommended
               </div>
             )}
             <div className="font-bold text-gray-900 text-lg">{pkg.name}</div>
             <div className="text-gray-500 text-sm mt-0.5">{pkg.description}</div>
             <div className="mt-3 flex items-baseline gap-1">
               {pkg.price_cents === 0 ? (
-                <span className="text-2xl font-bold text-green-500">免费</span>
+                <span className="text-2xl font-bold text-green-500">Free</span>
               ) : (
                 <>
                   <span className="text-2xl font-bold text-gray-900">
-                    ¥{(pkg.price_cents / 100).toFixed(0)}
+                    ${(pkg.price_cents / 100).toFixed(0)}
                   </span>
                   {pkg.subscription_interval && (
-                    <span className="text-sm text-gray-400">/{pkg.subscription_interval === "month" ? "月" : "年"}</span>
+                    <span className="text-sm text-gray-400">/{pkg.subscription_interval === "month" ? "mo" : "yr"}</span>
                   )}
                 </>
               )}
             </div>
             <div className="text-sm text-orange-600 font-medium mt-1">
-              {pkg.minutes >= 99999 ? "不限时长" : `${pkg.minutes} 分钟`}
+              {pkg.minutes >= 99999 ? "Unlimited" : `${pkg.minutes} min`}
             </div>
             <button className="mt-4 w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors">
-              {pkg.price_cents === 0 ? "已领取" : "立即购买"}
+              {pkg.price_cents === 0 ? "Claimed" : "Subscribe"}
             </button>
           </div>
         ))}
       </div>
 
       {/* Transaction history */}
-      <h2 className="font-semibold text-gray-900 mb-4">消费记录</h2>
+      <h2 className="font-semibold text-gray-900 mb-4">Transaction history</h2>
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {transactions.length === 0 ? (
-          <div className="py-8 text-center text-gray-400">暂无记录</div>
+          <div className="py-8 text-center text-gray-400">No records yet</div>
         ) : (
           <div className="divide-y divide-gray-50">
             {transactions.map((txn) => (
@@ -159,7 +159,7 @@ export default function TokensPage() {
                 <div className={`text-sm font-semibold ${
                   txn.seconds_delta > 0 ? "text-green-500" : "text-gray-400"
                 }`}>
-                  {txn.seconds_delta > 0 ? "+" : ""}{Math.round(txn.seconds_delta / 60)}分钟
+                  {txn.seconds_delta > 0 ? "+" : ""}{Math.round(txn.seconds_delta / 60)} min
                 </div>
               </div>
             ))}
