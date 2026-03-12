@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: qsb
+      POSTGRES_PASSWORD: qsb_dev_pass
+      POSTGRES_DB: qinshengban
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qsb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (session/cache)
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  # FastAPI backend
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://qsb:qsb_dev_pass@db:5432/qinshengban
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: "false"
+      # Override these in .env file:
+      # ANTHROPIC_API_KEY: sk-ant-xxx
+      # TWILIO_ACCOUNT_SID: ACxxx
+      # TWILIO_AUTH_TOKEN: xxx
+      # TWILIO_PHONE_NUMBER: +86xxx
+      # SECRET_KEY: your-secret-key
+      # BASE_URL: https://your-domain.com
+    env_file:
+      - ./backend/.env
+    volumes:
+      - recordings_data:/app/recordings
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Next.js frontend
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000/api
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  recordings_data:
