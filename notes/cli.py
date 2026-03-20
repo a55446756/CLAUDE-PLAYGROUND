@@ -43,6 +43,8 @@ def format_note(note) -> str:
     if note.title:
         lines.append(f"    📌 {note.title}")
     lines.append(f"    {note.content}")
+    if note.due_date:
+        lines.append(f"    📅 截止: {note.due_date.isoformat()}")
     if tags_str:
         lines.append(f"    {tags_str}")
     return "\n".join(lines)
@@ -57,6 +59,7 @@ def cmd_add(args):
         category=args.category,
         tags=tags,
         priority=args.priority,
+        due_date=args.due,
     )
     print(f"✅ 笔记已保存 (ID: {note.id})")
     print(format_note(note))
@@ -127,6 +130,7 @@ def cmd_update(args):
         category=args.category,
         tags=tags,
         priority=args.priority,
+        due_date=args.due,
     )
     if not note:
         print(f"❌ 笔记 #{args.id} 不存在")
@@ -165,6 +169,27 @@ def cmd_export(args):
         print(output)
 
 
+def cmd_ics(args):
+    from notes.ics import generate_ics
+    mgr = NoteManager()
+    include_done = args.all
+    notes = mgr.list_notes(include_done=include_done, limit=9999)
+    # Filter: only notes with due_date, or todo/work categories
+    cal_notes = [n for n in notes if n.due_date or n.category.value in ("todo", "work")]
+    ics_content = generate_ics(cal_notes)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(ics_content)
+        print(f"📅 已导出 {len(cal_notes)} 条日历事件到 {args.output}")
+    else:
+        print(ics_content)
+
+
+def cmd_serve(args):
+    from notes.server import run_server
+    run_server(host=args.host, port=args.port)
+
+
 def main():
     parser = argparse.ArgumentParser(description="📝 笔记管理系统")
     subparsers = parser.add_subparsers(dest="command", help="可用命令")
@@ -179,6 +204,7 @@ def main():
     p_add.add_argument("--tags", help="标签，逗号分隔")
     p_add.add_argument("--priority", "-p", help="优先级（自动检测）",
                        choices=["low", "medium", "high", "urgent"])
+    p_add.add_argument("--due", "-d", help="截止日期 (YYYY-MM-DD)，也可在内容中自然描述")
     p_add.set_defaults(func=cmd_add)
 
     # list
@@ -218,6 +244,7 @@ def main():
     p_upd.add_argument("--category", "-c", help="新分类")
     p_upd.add_argument("--tags", help="新标签")
     p_upd.add_argument("--priority", "-p", help="新优先级")
+    p_upd.add_argument("--due", "-d", help="新截止日期 (YYYY-MM-DD)")
     p_upd.set_defaults(func=cmd_update)
 
     # stats
@@ -228,6 +255,18 @@ def main():
     p_export = subparsers.add_parser("export", help="导出所有笔记为JSON")
     p_export.add_argument("--output", "-o", help="输出文件路径")
     p_export.set_defaults(func=cmd_export)
+
+    # ics
+    p_ics = subparsers.add_parser("ics", help="导出为ICS日历文件")
+    p_ics.add_argument("--output", "-o", help="输出文件路径 (默认输出到终端)")
+    p_ics.add_argument("--all", "-a", action="store_true", help="包含已完成")
+    p_ics.set_defaults(func=cmd_ics)
+
+    # serve
+    p_serve = subparsers.add_parser("serve", help="启动HTTP服务器提供日历订阅")
+    p_serve.add_argument("--host", default="0.0.0.0", help="监听地址 (默认: 0.0.0.0)")
+    p_serve.add_argument("--port", type=int, default=8080, help="端口 (默认: 8080)")
+    p_serve.set_defaults(func=cmd_serve)
 
     args = parser.parse_args()
     if not args.command:

@@ -1,7 +1,7 @@
 """Note manager — add, search, list, categorize notes."""
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 from notes.db import SessionLocal, init_db
@@ -86,6 +86,69 @@ def auto_detect_priority(text: str) -> Priority:
     return Priority.MEDIUM
 
 
+def auto_detect_due_date(text: str) -> Optional[date]:
+    """Detect due date from natural language cues in text."""
+    today = date.today()
+    text_lower = text.lower()
+
+    # Explicit date: 2026-03-25, 2026/03/25, 3月25日, 3/25
+    m = re.search(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", text)
+    if m:
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            pass
+
+    m = re.search(r"(\d{1,2})月(\d{1,2})[日号]", text)
+    if m:
+        try:
+            return date(today.year, int(m.group(1)), int(m.group(2)))
+        except ValueError:
+            pass
+
+    m = re.search(r"(\d{1,2})/(\d{1,2})", text)
+    if m:
+        try:
+            return date(today.year, int(m.group(1)), int(m.group(2)))
+        except ValueError:
+            pass
+
+    # Relative days
+    if "今天" in text:
+        return today
+    if "明天" in text or "tomorrow" in text_lower:
+        return today + timedelta(days=1)
+    if "后天" in text:
+        return today + timedelta(days=2)
+    if "大后天" in text:
+        return today + timedelta(days=3)
+
+    # N天后 / N天内
+    m = re.search(r"(\d+)\s*天[后内]", text)
+    if m:
+        return today + timedelta(days=int(m.group(1)))
+
+    # 下周X / 周X / 本周X
+    weekday_map = {
+        "一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6, "天": 6,
+    }
+    m = re.search(r"(下周|下礼拜|下星期|周|本周|这周|礼拜|星期)([一二三四五六日天])", text)
+    if m:
+        prefix = m.group(1)
+        target_wd = weekday_map.get(m.group(2), 0)
+        current_wd = today.weekday()
+        if prefix in ("下周", "下礼拜", "下星期"):
+            days_ahead = (target_wd - current_wd) % 7 + 7
+        else:
+            days_ahead = (target_wd - current_wd) % 7
+            if days_ahead == 0:
+                days_ahead = 7
+        return today + timedelta(days=days_ahead)
+
+    # "X之前" pattern — already handled by the above patterns
+    return None
+
+
 class NoteManager:
     def __init__(self):
         init_db()
@@ -100,6 +163,7 @@ class NoteManager:
         category: Optional[str] = None,
         tags: Optional[list[str]] = None,
         priority: Optional[str] = None,
+        due_date: Optional[str] = None,
     ) -> Note:
         """Add a new note with auto-categorization."""
         session = self._get_session()
@@ -109,12 +173,18 @@ class NoteManager:
             extracted_tags = auto_extract_tags(content)
             all_tags = list(set((tags or []) + extracted_tags))
 
+            if due_date:
+                parsed_due = date.fromisoformat(due_date)
+            else:
+                parsed_due = auto_detect_due_date(content)
+
             note = Note(
                 content=content,
                 title=title,
                 category=detected_category,
                 tags=all_tags,
                 priority=detected_priority,
+                due_date=parsed_due,
             )
             session.add(note)
             session.commit()
@@ -179,6 +249,7 @@ class NoteManager:
         tags: Optional[list[str]] = None,
         priority: Optional[str] = None,
         is_done: Optional[bool] = None,
+        due_date: Optional[str] = None,
     ) -> Optional[Note]:
         """Update an existing note."""
         session = self._get_session()
@@ -198,6 +269,8 @@ class NoteManager:
                 note.priority = Priority(priority)
             if is_done is not None:
                 note.is_done = is_done
+            if due_date is not None:
+                note.due_date = date.fromisoformat(due_date) if due_date else None
             note.updated_at = datetime.now(timezone.utc)
             session.commit()
             session.refresh(note)
