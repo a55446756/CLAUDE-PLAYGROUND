@@ -1,0 +1,52 @@
+name: Daily AI News Anchor
+
+on:
+  schedule:
+    # 每天 UTC 22:00 = 北京时间 06:00
+    - cron: '0 22 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  generate-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Python deps
+        run: |
+          cd ai-news-anchor
+          pip install -r requirements.txt
+
+      - name: Create config from secrets
+        run: |
+          cd ai-news-anchor
+          cp config/settings.example.yaml config/settings.yaml
+          # Replace API keys from GitHub Secrets
+          sed -i "s/YOUR_ANTHROPIC_API_KEY/${{ secrets.ANTHROPIC_API_KEY }}/g" config/settings.yaml
+          sed -i "s/YOUR_ELEVENLABS_API_KEY/${{ secrets.ELEVENLABS_API_KEY }}/g" config/settings.yaml
+          sed -i "s/YOUR_HEYGEN_API_KEY/${{ secrets.HEYGEN_API_KEY }}/g" config/settings.yaml
+          sed -i "s/YOUR_NEWSAPI_KEY/${{ secrets.NEWSAPI_KEY }}/g" config/settings.yaml
+
+      - name: Run pipeline
+        run: |
+          cd ai-news-anchor
+          python -m pipeline.main
+
+      - name: Upload output video
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-news-${{ github.run_number }}
+          path: ai-news-anchor/output/*.mp4
+          retention-days: 30

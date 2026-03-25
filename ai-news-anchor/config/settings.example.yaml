@@ -1,0 +1,108 @@
+# AI News Anchor 配置文件
+# 复制此文件为 settings.yaml 并填入你的 API keys
+
+# ========== 新闻采集 ==========
+news:
+  sources:
+    - type: newsapi
+      api_key: "YOUR_NEWSAPI_KEY"
+      country: "cn"
+      category: "general"
+      page_size: 20
+    - type: rss
+      urls:
+        - "https://feeds.bbci.co.uk/news/world/rss.xml"
+        - "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+        - "https://rsshub.app/zaobao/realtime/china"
+        - "https://rsshub.app/thepaper/newsDetail/25"
+  max_stories: 8           # 每期最多新闻条数
+  language: "zh"            # 主语言: zh / en / bilingual
+  filter_keywords: []       # 过滤关键词
+
+# ========== LLM 脚本生成 ==========
+llm:
+  provider: "anthropic"     # anthropic / openai
+  model: "claude-sonnet-4-20250514"
+  api_key: "YOUR_ANTHROPIC_API_KEY"
+  max_tokens: 8000
+  temperature: 0.8          # 稍高温度，让风格更活泼
+
+# ========== TTS 语音合成 ==========
+tts:
+  provider: "elevenlabs"    # elevenlabs / fish_audio / cosyvoice / openai
+  api_key: "YOUR_ELEVENLABS_API_KEY"
+
+  elevenlabs:
+    voice_id: "EXAVITQu4vr4xnSDxMaL"  # "Bella" — 温暖女声
+    model_id: "eleven_multilingual_v2"
+    stability: 0.5
+    similarity_boost: 0.75
+    style: 0.4              # 情感表现力
+    speaking_rate: 1.05      # 略快，符合新闻节奏
+
+  fish_audio:
+    api_key: "YOUR_FISH_AUDIO_KEY"
+    voice_id: "YOUR_VOICE_ID"
+
+  openai:
+    api_key: "YOUR_OPENAI_KEY"
+    voice: "nova"            # nova = 温暖女声
+    model: "tts-1-hd"
+    speed: 1.05
+
+# ========== 数字人视频 ==========
+video:
+  provider: "heygen"        # heygen / musetalk / hallo2
+  api_key: "YOUR_HEYGEN_API_KEY"
+
+  heygen:
+    avatar_id: "YOUR_AVATAR_ID"     # 自定义形象 or 平台形象
+    background: "#1a1a2e"           # 深色新闻演播室背景
+    resolution: "1080p"
+    aspect_ratio: "16:9"
+
+  musetalk:                 # 开源方案 — 需要 GPU 服务器
+    model_path: "./models/musetalk"
+    reference_image: "./assets/anchor_reference.png"
+    gpu_device: "cuda:0"
+
+  hallo2:                   # 开源方案
+    model_path: "./models/hallo2"
+    reference_image: "./assets/anchor_reference.png"
+
+# ========== 视频合成 ==========
+composition:
+  resolution: [1920, 1080]
+  fps: 30
+  intro_duration: 5          # 片头秒数
+  outro_duration: 5          # 片尾秒数
+  lower_third: true          # 新闻标题栏
+  background_music: "./assets/news_bgm.mp3"
+  bgm_volume: 0.08           # 背景音乐音量
+  subtitle: true             # 字幕
+  subtitle_font: "Noto Sans CJK SC"
+  subtitle_fontsize: 36
+
+# ========== 发布 ==========
+publish:
+  youtube:
+    enabled: false
+    credentials_file: "./config/youtube_oauth.json"
+    channel_id: "YOUR_CHANNEL_ID"
+    privacy: "public"         # public / unlisted / private
+    title_template: "AI早报 {date} | {headline}"
+    description_template: |
+      AI 新闻主播为您播报今日要闻
+      本视频由 AI 全自动生成
+      #AI新闻 #每日播报
+
+  local:
+    enabled: true
+    output_dir: "./output"
+
+# ========== 调度 ==========
+schedule:
+  daily_time: "06:00"        # 每天生成时间
+  timezone: "Asia/Shanghai"
+  retry_on_failure: true
+  max_retries: 3

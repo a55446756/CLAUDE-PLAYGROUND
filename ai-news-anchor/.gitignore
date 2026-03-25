@@ -1,0 +1,10 @@
+config/settings.yaml
+config/youtube_oauth.json
+output/
+*.mp4
+*.mp3
+*.wav
+models/
+__pycache__/
+*.pyc
+.env
