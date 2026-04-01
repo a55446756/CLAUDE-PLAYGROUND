@@ -1,0 +1,10 @@
+Strategy,Short,Total Cash In,BTC Held,Portfolio $,Net Profit $,ROI %,Max Drawdown %,Calmar Ratio,Savings $,Notes,Rank ROI,Rank Calmar,Rank BTC,Score,Overall Rank
+MA-Conservative (x²),S3-MAcon,137000.0000,3.6112,287996.5941,150996.5941,110.2165,-40.7375,2.7055,42062.3832,invest_pct = (ma/price)²; very conservative at tops,2,2,2,6,1
+Threshold Bimodal,S9-BMOD,137000.0000,3.4907,297613.8895,160613.8895,117.2364,-39.1931,2.9913,59886.6648,Below MA=all-in+savings; >1.5×MA=save everything,1,1,4,6,1
+MA-Linear,S2-MAlin,137000.0000,3.6260,274717.2342,137717.2342,100.5235,-41.8913,2.3996,27775.0589,invest_pct = ma/price; saves above MA,3,3,1,7,3
+MA-Aggressive (√x),S4-MAagg,137000.0000,3.5401,257164.9918,120164.9918,87.7117,-42.8222,2.0483,16074.9532,invest_pct = √(ma/price); buys more even above MA,4,5,3,12,4
+ATH-Discount,S7-ATH,137000.0000,3.2070,256820.7471,119820.7471,87.4604,-40.3822,2.1658,38416.9736,invest_pct = disc^0.4; more discount = more buy,5,4,6,15,5
+Simple DCA $500/wk,S1-DCA,136500.0000,3.3027,224922.6461,88422.6461,64.7785,-46.1048,1.4050,0.0000,"Baseline: $500 every week, no savings",7,8,5,20,6
+Value Averaging,S8-VAVG,133902.3853,2.3911,226838.7528,92936.3675,69.4061,-46.0315,1.5078,64000.0000,Target $500/wk linear growth; surplus goes to savings,6,7,7,20,6
+MA × RSI Combined,S6-MARSI,137000.0000,2.1906,209951.0350,72951.0350,53.2489,-35.1548,1.5147,60768.8961,Geometric mean of MA signal & RSI signal,8,6,8,22,8
+RSI-Weighted,S5-RSI,137000.0000,1.8237,190773.8409,53773.8409,39.2510,-31.4478,1.2481,66577.1155,invest_pct = 1 - RSI/100; deploys savings when RSI<30,9,9,9,27,9
