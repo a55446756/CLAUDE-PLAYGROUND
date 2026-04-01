@@ -95,8 +95,8 @@ def run_strategy(prices, ma200, sell_above_ma=False):
 
         # ── SELL logic (Strategy 3 only) ──
         sell_amt = 0.0
-        if sell_above_ma and ratio > 1.0:
-            target_sell = 500.0 * (ratio - 1.0)   # sell more the further above MA
+        if sell_above_ma and ratio > 2.0:
+            target_sell = 500.0 * (ratio - 1.0)   # only sell when price > 2× MA
             sell_btc    = min(target_sell / price, btc)   # can't sell more than we have
             sell_amt    = sell_btc * price
             btc        -= sell_btc
